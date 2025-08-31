@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venta de Boletos de Autobús (Simulación)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .seat {
+            width: 35px;
+            height: 35px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .seat.available { background-color: #d1d5db; color: #374151; }
+        .seat.available:hover { background-color: #9ca3af; }
+        .seat.selected { background-color: #3b82f6; color: white; transform: scale(1.1); }
+        .seat.occupied { background-color: #ef4444; color: white; cursor: not-allowed; }
+        .seat.aisle { cursor: default; background-color: transparent; }
+        .nav-link.active { background-color: #3b82f6; color: white; }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #ticketContent, #ticketContent * {
+                visibility: visible;
+            }
+            #ticketContent {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 1.5rem;
+                border: none;
+                box-shadow: none;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="flex h-screen bg-gray-200 no-print">
+        <!-- Menú Lateral -->
+        <div class="w-64 bg-gray-800 text-white flex flex-col">
+            <div class="px-8 py-6 border-b border-gray-700">
+                <h2 class="text-2xl font-semibold">Autobuses AVC</h2>
+            </div>
+            <nav class="flex-1 px-4 py-4 space-y-2">
+                <a href="#" id="navVenta" class="nav-link flex items-center px-4 py-2 rounded-md active">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+                    Venta de Boletos
+                </a>
+                <a href="#" id="navHistorial" class="nav-link flex items-center px-4 py-2 rounded-md hover:bg-gray-700">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Historial de Ventas
+                </a>
+                <a href="#" id="navConfig" class="nav-link flex items-center px-4 py-2 rounded-md hover:bg-gray-700">
+                    <svg class="w-6 h-6 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Configuración
+                </a>
+            </nav>
+        </div>
+
+        <!-- Contenido Principal -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 p-4 md:p-8">
+                <!-- Panel de Venta de Boletos -->
+                <div id="panelVenta">
+                    <div id="mainFormContainer" class="w-full max-w-xl md:max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 md:p-10">
+                        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Sistema de Boletos</h1>
+                        <p id="rutaHeader" class="text-center text-gray-500 mb-8"></p>
+                        <form id="boletoForm" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="ruta" class="block text-sm font-medium text-gray-700 mb-1">Ruta:</label>
+                                    <select id="ruta" name="ruta" required class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></select>
+                                </div>
+                                <div>
+                                    <label for="autobus" class="block text-sm font-medium text-gray-700 mb-1">Número de Autobús:</label>
+                                    <select id="autobus" name="autobus" required class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></select>
+                                </div>
+                            </div>
+                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label for="horario" class="block text-sm font-medium text-gray-700 mb-1">Horario (Automático):</label>
+                                    <input type="text" id="horario" name="horario" readonly class="w-full p-3 bg-gray-200 border border-gray-300 rounded-lg cursor-not-allowed">
+                                </div>
+                                <div>
+                                    <label for="fecha" class="block text-sm font-medium text-gray-700 mb-1">Fecha de Viaje:</label>
+                                    <input type="date" id="fecha" name="fecha" required class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="cantidad" class="block text-sm font-medium text-gray-700 mb-1">Cantidad de Boletos:</label>
+                                <input type="number" id="cantidad" name="cantidad" min="1" max="10" value="1" required class="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition">
+                            </div>
+                            <div class="bg-blue-50 p-4 rounded-lg text-center">
+                                <div class="flex justify-around items-center">
+                                    <div>
+                                        <p class="text-sm text-gray-600">Precio por boleto:</p>
+                                        <p id="precioUnitario" class="font-semibold text-lg"></p>
+                                    </div>
+                                    <div>
+                                        <p class="text-sm text-gray-600">Autobús N°:</p>
+                                        <p id="busIdDisplay" class="font-semibold text-lg"></p>
+                                    </div>
+                                </div>
+                                <p class="text-lg text-gray-800 mt-4">Total a pagar:</p>
+                                <p id="total" class="text-3xl font-bold text-blue-600"></p>
+                            </div>
+                            <p id="asientosDisponibles" class="text-center font-semibold text-gray-600"></p>
+                            <button type="submit" class="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition-transform transform hover:scale-105">Seleccionar Asientos</button>
+                        </form>
+                        <div id="mensaje" class="mt-6 text-center font-semibold rounded-lg p-4 hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Panel de Historial -->
+                <div id="panelHistorial" class="hidden">
+                     <div class="w-full max-w-xl md:max-w-2xl mx-auto bg-white rounded-xl shadow-lg p-8 md:p-10">
+                        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Historial de Ventas</h1>
+                        <p class="text-center text-gray-500 mt-4">Aquí se mostrará un registro de todos los boletos vendidos.</p>
+                        <div id="historialContainer" class="mt-6"></div>
+                    </div>
+                </div>
+
+                <!-- Panel de Configuración -->
+                <div id="panelConfig" class="hidden">
+                    <div class="w-full max-w-xl md:max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-8 md:p-10">
+                        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Configuración</h1>
+                        <form id="configForm" class="space-y-8">
+                            <div>
+                                <h2 class="text-xl font-semibold mb-4 border-b pb-2">Precios de Rutas</h2>
+                                <div id="configPreciosContainer" class="space-y-2"></div>
+                            </div>
+                            <div>
+                                <h2 class="text-xl font-semibold mb-4 border-b pb-2">Autobuses y Asientos por Horario</h2>
+                                <div id="configBusesContainer" class="space-y-3"></div>
+                            </div>
+                            <button type="submit" class="w-full py-3 px-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition">Guardar Cambios</button>
+                        </form>
+                        <div id="configMensaje" class="mt-6 text-center font-semibold rounded-lg p-4 hidden"></div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal de Selección de Asientos -->
+    <div id="modalAsientos" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-xl">
+            <h2 class="text-2xl font-bold text-center mb-4">Elige tus asientos</h2>
+            <p id="seleccionInfo" class="text-center text-gray-600 mb-6">Debes seleccionar <span id="cantidadAsientosInfo" class="font-bold"></span> asiento(s).</p>
+            <div class="bg-gray-100 p-4 rounded-lg max-h-96 overflow-y-auto">
+                <div class="flex justify-between items-center mb-2 px-2">
+                    <span class="text-sm font-medium text-gray-500">Frente</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m12 0a2 2 0 100-4m0 4a2 2 0 110-4" /></svg>
+                </div>
+                <div id="busLayout" class="grid grid-cols-5 gap-2 justify-center"></div>
+            </div>
+            <div class="mt-6 flex flex-col md:flex-row gap-3">
+                <button id="confirmarCompraBtn" class="w-full py-3 px-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 focus:outline-none focus:ring-4 focus:ring-green-300 transition disabled:bg-gray-400 disabled:cursor-not-allowed">Confirmar Compra</button>
+                <button id="cancelarBtn" class="w-full py-3 px-4 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-4 focus:ring-gray-300 transition">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Configuración de Asientos -->
+    <div id="modalConfigAsientos" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden no-print">
+        <div class="bg-white rounded-xl shadow-lg p-8 w-full max-w-xl">
+            <h2 class="text-2xl font-bold text-center mb-4">Habilitar / Deshabilitar Asientos</h2>
+            <p id="configBusId" class="text-center text-gray-600 mb-6"></p>
+            <div class="bg-gray-100 p-4 rounded-lg max-h-96 overflow-y-auto">
+                 <div class="flex justify-between items-center mb-2 px-2">
+                    <span class="text-sm font-medium text-gray-500">Frente</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m12 0a2 2 0 100-4m0 4a2 2 0 110-4" /></svg>
+                </div>
+                <div id="busLayoutConfig" class="grid grid-cols-5 gap-2 justify-center"></div>
+            </div>
+            <div class="mt-6">
+                <button id="guardarConfigAsientosBtn" class="w-full py-3 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition">Guardar y Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Ticket para Imprimir -->
+    <div id="modalTicket" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div id="ticketContent" class="bg-white rounded-lg shadow-lg w-full max-w-sm p-6 relative">
+            <!-- Contenido del Ticket -->
+            <div class="text-center">
+                <img src="http://googleusercontent.com/file_content/1" alt="Logo A Torres" class="mx-auto h-16 mb-4" onerror="this.style.display='none'">
+                <h2 class="text-xl font-bold">Pase de Abordar</h2>
+            </div>
+            <div class="border-t border-b border-dashed my-4 py-4 text-sm space-y-2">
+                <div class="flex justify-between">
+                    <span class="font-bold text-gray-600">RUTA:</span>
+                    <span id="ticketRuta" class="text-right font-semibold"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-bold text-gray-600">FECHA:</span>
+                    <span id="ticketFecha" class="font-semibold"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-bold text-gray-600">HORA:</span>
+                    <span id="ticketHora" class="font-semibold"></span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="font-bold text-gray-600">AUTOBÚS:</span>
+                    <span id="ticketAutobus" class="font-semibold"></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="font-bold text-gray-600">ASIENTOS:</span>
+                    <span id="ticketAsientos" class="font-bold text-lg text-blue-600"></span>
+                </div>
+            </div>
+            <div class="text-center space-y-2">
+                <p class="text-sm text-gray-600">Total Pagado</p>
+                <p id="ticketTotal" class="text-2xl font-bold"></p>
+                <p class="text-xs text-gray-500 pt-2">Folio: <span id="ticketFolio"></span></p>
+                <p class="text-xs font-semibold pt-2">¡Gracias por su preferencia! ¡Buen viaje!</p>
+            </div>
+            <!-- Botones -->
+            <div class="mt-6 flex flex-col gap-3 no-print">
+                <button id="imprimirTicketBtn" class="w-full py-2 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Imprimir Ticket</button>
+                <button id="cerrarTicketBtn" class="w-full py-2 px-4 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- SIMULACIÓN DE LA BASE DE DATOS ---
+        function generarAsientos() {
+            const asientos = [];
+            const filas = 20; // Aumentado a 20 filas para 80 asientos
+            const letras = ['A', 'B', 'C', 'D'];
+            for (let i = 1; i <= filas; i++) {
+                for (let j = 0; j < letras.length; j++) {
+                    asientos.push({ id: `${letras[j]}${i}`, status: 'available' });
+                }
+            }
+            return asientos;
+        }
+
+        let db = {
+            rutas: {
+                "slm-cv": { id: 1, origen: "Soto La Marina", destino: "Ciudad Victoria", precio: 150.00 },
+                "cv-slm": { id: 2, origen: "Ciudad Victoria", destino: "Soto La Marina", precio: 150.00 },
+                "slm-vdc": { id: 3, origen: "Soto La Marina", destino: "Villa de Casas", precio: 100.00 },
+                "vdc-slm": { id: 4, origen: "Villa de Casas", destino: "Soto La Marina", precio: 100.00 },
+                "cv-vdc": { id: 5, origen: "Ciudad Victoria", destino: "Villa de Casas", precio: 80.00 },
+                "vdc-cv": { id: 6, origen: "Villa de Casas", destino: "Ciudad Victoria", precio: 80.00 }
+            },
+            horarios: [
+                // Horarios de Soto La Marina a Ciudad Victoria
+                { id: 101, id_ruta: 1, hora: "06:00:00", busId: "SLM-CV-0600", seatMap: generarAsientos() },
+                { id: 102, id_ruta: 1, hora: "07:30:00", busId: "SLM-CV-0730", seatMap: generarAsientos() },
+                { id: 103, id_ruta: 1, hora: "10:30:00", busId: "SLM-CV-1030", seatMap: generarAsientos() },
+                { id: 104, id_ruta: 1, hora: "13:30:00", busId: "SLM-CV-1330", seatMap: generarAsientos() },
+                { id: 105, id_ruta: 1, hora: "16:20:00", busId: "SLM-CV-1620", seatMap: generarAsientos() },
+                // Horarios de Ciudad Victoria a Soto La Marina
+                { id: 201, id_ruta: 2, hora: "08:00:00", busId: "CV-SLM-0800", seatMap: generarAsientos() },
+                { id: 202, id_ruta: 2, hora: "11:00:00", busId: "CV-SLM-1100", seatMap: generarAsientos() },
+                { id: 203, id_ruta: 2, hora: "13:50:00", busId: "CV-SLM-1350", seatMap: generarAsientos() },
+                { id: 204, id_ruta: 2, hora: "16:30:00", busId: "CV-SLM-1630", seatMap: generarAsientos() },
+                { id: 205, id_ruta: 2, hora: "17:50:00", busId: "CV-SLM-1750", seatMap: generarAsientos() },
+                // Horarios de Soto La Marina a Villa de Casas (mismos que a CV)
+                { id: 301, id_ruta: 3, hora: "06:00:00", busId: "SLM-VDC-0600", seatMap: generarAsientos() },
+                { id: 302, id_ruta: 3, hora: "07:30:00", busId: "SLM-VDC-0730", seatMap: generarAsientos() },
+                { id: 303, id_ruta: 3, hora: "10:30:00", busId: "SLM-VDC-1030", seatMap: generarAsientos() },
+                { id: 304, id_ruta: 3, hora: "13:30:00", busId: "SLM-VDC-1330", seatMap: generarAsientos() },
+                { id: 305, id_ruta: 3, hora: "16:20:00", busId: "SLM-VDC-1620", seatMap: generarAsientos() },
+                // Horarios de Villa de Casas a Soto La Marina (mismos que CV a SLM)
+                { id: 401, id_ruta: 4, hora: "08:00:00", busId: "VDC-SLM-0800", seatMap: generarAsientos() },
+                { id: 402, id_ruta: 4, hora: "11:00:00", busId: "VDC-SLM-1100", seatMap: generarAsientos() },
+                { id: 403, id_ruta: 4, hora: "13:50:00", busId: "VDC-SLM-1350", seatMap: generarAsientos() },
+                { id: 404, id_ruta: 4, hora: "16:30:00", busId: "VDC-SLM-1630", seatMap: generarAsientos() },
+                { id: 405, id_ruta: 4, hora: "17:50:00", busId: "VDC-SLM-1750", seatMap: generarAsientos() },
+                // Horarios de Ciudad Victoria a Villa de Casas (mismos que CV a SLM)
+                { id: 501, id_ruta: 5, hora: "08:00:00", busId: "CV-VDC-0800", seatMap: generarAsientos() },
+                { id: 502, id_ruta: 5, hora: "11:00:00", busId: "CV-VDC-1100", seatMap: generarAsientos() },
+                { id: 503, id_ruta: 5, hora: "13:50:00", busId: "CV-VDC-1350", seatMap: generarAsientos() },
+                { id: 504, id_ruta: 5, hora: "16:30:00", busId: "CV-VDC-1630", seatMap: generarAsientos() },
+                { id: 505, id_ruta: 5, hora: "17:50:00", busId: "CV-VDC-1750", seatMap: generarAsientos() },
+                // Horarios de Villa de Casas a Ciudad Victoria (mismos que SLM a CV)
+                { id: 601, id_ruta: 6, hora: "06:00:00", busId: "VDC-CV-0600", seatMap: generarAsientos() },
+                { id: 602, id_ruta: 6, hora: "07:30:00", busId: "VDC-CV-0730", seatMap: generarAsientos() },
+                { id: 603, id_ruta: 6, hora: "10:30:00", busId: "VDC-CV-1030", seatMap: generarAsientos() },
+                { id: 604, id_ruta: 6, hora: "13:30:00", busId: "VDC-CV-1330", seatMap: generarAsientos() },
+                { id: 605, id_ruta: 6, hora: "16:20:00", busId: "VDC-CV-1620", seatMap: generarAsientos() }
+            ],
+            historial: []
+        };
+
+        // --- REFERENCIAS A ELEMENTOS DEL DOM ---
+        const navLinks = document.querySelectorAll('.nav-link');
+        const panels = { Venta: document.getElementById('panelVenta'), Historial: document.getElementById('panelHistorial'), Config: document.getElementById('panelConfig') };
+        const rutaHeader = document.getElementById('rutaHeader');
+        const rutaSelect = document.getElementById('ruta');
+        const autobusSelect = document.getElementById('autobus');
+        const horarioInput = document.getElementById('horario');
+        const cantidadInput = document.getElementById('cantidad');
+        const totalSpan = document.getElementById('total');
+        const precioUnitarioSpan = document.getElementById('precioUnitario');
+        const busIdDisplay = document.getElementById('busIdDisplay');
+        const fechaInput = document.getElementById('fecha');
+        const form = document.getElementById('boletoForm');
+        const mensajeDiv = document.getElementById('mensaje');
+        const asientosDisponiblesP = document.getElementById('asientosDisponibles');
+        const modalAsientos = document.getElementById('modalAsientos');
+        const busLayout = document.getElementById('busLayout');
+        const cantidadAsientosInfo = document.getElementById('cantidadAsientosInfo');
+        const confirmarCompraBtn = document.getElementById('confirmarCompraBtn');
+        const cancelarBtn = document.getElementById('cancelarBtn');
+        const configForm = document.getElementById('configForm');
+        const configMensaje = document.getElementById('configMensaje');
+        const historialContainer = document.getElementById('historialContainer');
+        const modalConfigAsientos = document.getElementById('modalConfigAsientos');
+        const busLayoutConfig = document.getElementById('busLayoutConfig');
+        const configBusId = document.getElementById('configBusId');
+        const guardarConfigAsientosBtn = document.getElementById('guardarConfigAsientosBtn');
+        const modalTicket = document.getElementById('modalTicket');
+        const ticketRuta = document.getElementById('ticketRuta');
+        const ticketFecha = document.getElementById('ticketFecha');
+        const ticketHora = document.getElementById('ticketHora');
+        const ticketAutobus = document.getElementById('ticketAutobus');
+        const ticketAsientos = document.getElementById('ticketAsientos');
+        const ticketTotal = document.getElementById('ticketTotal');
+        const ticketFolio = document.getElementById('ticketFolio');
+        const imprimirTicketBtn = document.getElementById('imprimirTicketBtn');
+        const cerrarTicketBtn = document.getElementById('cerrarTicketBtn');
+
+        let asientosSeleccionados = [];
+
+        // --- LÓGICA DE NAVEGACIÓN ---
+        function switchPanel(panelName) {
+            Object.values(panels).forEach(p => p.classList.add('hidden'));
+            navLinks.forEach(l => l.classList.remove('active'));
+            panels[panelName].classList.remove('hidden');
+            document.getElementById(`nav${panelName}`).classList.add('active');
+            if (panelName === 'Config') popularConfigForm();
+            if (panelName === 'Historial') renderizarHistorial();
+        }
+
+        document.getElementById('navVenta').addEventListener('click', (e) => { e.preventDefault(); switchPanel('Venta'); });
+        document.getElementById('navHistorial').addEventListener('click', (e) => { e.preventDefault(); switchPanel('Historial'); });
+        document.getElementById('navConfig').addEventListener('click', (e) => { e.preventDefault(); switchPanel('Config'); });
+
+        // --- LÓGICA DE VENTA DE BOLETOS ---
+        function setDefaultDate() {
+            const hoy = new Date();
+            const offset = hoy.getTimezoneOffset();
+            const hoyLocal = new Date(hoy.getTime() - (offset * 60 * 1000));
+            fechaInput.value = hoyLocal.toISOString().split('T')[0];
+            fechaInput.min = hoyLocal.toISOString().split('T')[0];
+        }
+
+        function popularRutas() {
+            rutaSelect.innerHTML = '';
+            for (const key in db.rutas) {
+                const ruta = db.rutas[key];
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = `${ruta.origen} a ${ruta.destino}`;
+                rutaSelect.appendChild(option);
+            }
+        }
+
+        function cargarAutobuses() {
+            const rutaSeleccionada = db.rutas[rutaSelect.value];
+            rutaHeader.innerHTML = `${rutaSeleccionada.origen} <span class="font-sans">&harr;</span> ${rutaSeleccionada.destino}`;
+            const horariosParaRuta = db.horarios.filter(h => h.id_ruta === rutaSeleccionada.id);
+            autobusSelect.innerHTML = '';
+            horariosParaRuta.forEach(h => {
+                const option = document.createElement('option');
+                option.value = h.id;
+                option.textContent = h.busId;
+                autobusSelect.appendChild(option);
+            });
+            actualizarHorarioYInfo();
+        }
+
+        function actualizarHorarioYInfo() {
+            const horarioId = parseInt(autobusSelect.value);
+            const horarioInfo = db.horarios.find(h => h.id === horarioId);
+            const rutaInfo = db.rutas[rutaSelect.value];
+            const cantidad = parseInt(cantidadInput.value) || 0;
+            if (horarioInfo) {
+                horarioInput.value = horarioInfo.hora.substring(0, 5) + ` hrs`;
+                const disponibles = horarioInfo.seatMap.filter(s => s.status === 'available').length;
+                asientosDisponiblesP.textContent = `Asientos Disponibles: ${disponibles}`;
+                busIdDisplay.textContent = horarioInfo.busId;
+            }
+            if (rutaInfo) {
+                precioUnitarioSpan.textContent = '$' + rutaInfo.precio.toFixed(2);
+                totalSpan.textContent = (cantidad > 0) ? '$' + (cantidad * rutaInfo.precio).toFixed(2) : '$0.00';
+            }
+        }
+
+        function renderizarBus(horarioId, cantidadASeleccionar) {
+            const horario = db.horarios.find(h => h.id === horarioId);
+            busLayout.innerHTML = '';
+            asientosSeleccionados = [];
+            horario.seatMap.forEach((asiento, index) => {
+                const seatDiv = document.createElement('div');
+                seatDiv.className = `seat ${asiento.status}`;
+                seatDiv.textContent = asiento.id;
+                seatDiv.dataset.seatId = asiento.id;
+                if (asiento.status === 'available') {
+                    seatDiv.addEventListener('click', () => toggleSeleccionAsiento(seatDiv, cantidadASeleccionar));
+                }
+                const pasilloDiv = document.createElement('div');
+                pasilloDiv.className = 'seat aisle';
+                if ((index + 1) % 2 === 0 && (index + 1) % 4 !== 0) {
+                    busLayout.appendChild(seatDiv);
+                    busLayout.appendChild(pasilloDiv);
+                } else {
+                    busLayout.appendChild(seatDiv);
+                }
+            });
+            actualizarEstadoConfirmacion(cantidadASeleccionar);
+        }
+
+        function toggleSeleccionAsiento(seatDiv, cantidadASeleccionar) {
+            const seatId = seatDiv.dataset.seatId;
+            if (asientosSeleccionados.includes(seatId)) {
+                asientosSeleccionados = asientosSeleccionados.filter(id => id !== seatId);
+                seatDiv.classList.remove('selected');
+            } else {
+                if (asientosSeleccionados.length < cantidadASeleccionar) {
+                    asientosSeleccionados.push(seatId);
+                    seatDiv.classList.add('selected');
+                } else {
+                    alert(`Solo puedes seleccionar ${cantidadASeleccionar} asiento(s).`);
+                }
+            }
+            actualizarEstadoConfirmacion(cantidadASeleccionar);
+        }
+
+        function actualizarEstadoConfirmacion(cantidadASeleccionar) {
+            confirmarCompraBtn.disabled = asientosSeleccionados.length !== cantidadASeleccionar;
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const cantidad = parseInt(cantidadInput.value);
+            const horarioId = parseInt(autobusSelect.value);
+            const horario = db.horarios.find(h => h.id === horarioId);
+            const disponibles = horario.seatMap.filter(s => s.status === 'available').length;
+            if (cantidad > disponibles) {
+                mensajeDiv.textContent = `Error: Solo quedan ${disponibles} asientos. No puedes comprar ${cantidad}.`;
+                mensajeDiv.className = 'mt-6 text-center font-semibold rounded-lg p-4 bg-red-100 text-red-700';
+                return;
+            }
+            cantidadAsientosInfo.textContent = cantidad;
+            renderizarBus(horarioId, cantidad);
+            modalAsientos.classList.remove('hidden');
+        });
+
+        cancelarBtn.addEventListener('click', () => modalAsientos.classList.add('hidden'));
+
+        function mostrarTicket(venta) {
+            ticketRuta.textContent = venta.ruta;
+            ticketFecha.textContent = venta.fecha;
+            ticketHora.textContent = venta.horario.substring(0, 5) + ' hrs';
+            ticketAutobus.textContent = venta.busId;
+            ticketAsientos.textContent = venta.asientos;
+            ticketTotal.textContent = '$' + venta.total.toFixed(2);
+            ticketFolio.textContent = venta.folio;
+            modalTicket.classList.remove('hidden');
+        }
+
+        confirmarCompraBtn.addEventListener('click', () => {
+            const horarioId = parseInt(autobusSelect.value);
+            const horario = db.horarios.find(h => h.id === horarioId);
+            const ruta = Object.values(db.rutas).find(r => r.id === horario.id_ruta);
+            asientosSeleccionados.forEach(seatId => {
+                const asiento = horario.seatMap.find(s => s.id === seatId);
+                if (asiento) asiento.status = 'occupied';
+            });
+            
+            const venta = {
+                ruta: `${ruta.origen} a ${ruta.destino}`,
+                fecha: fechaInput.value,
+                horario: horario.hora,
+                busId: horario.busId,
+                cantidad: asientosSeleccionados.length,
+                asientos: asientosSeleccionados.join(', '),
+                total: asientosSeleccionados.length * ruta.precio,
+                folio: Date.now(),
+                timestamp: new Date()
+            };
+            db.historial.push(venta);
+            modalAsientos.classList.add('hidden');
+            mostrarTicket(venta);
+            actualizarHorarioYInfo();
+        });
+        
+        imprimirTicketBtn.addEventListener('click', () => window.print());
+        cerrarTicketBtn.addEventListener('click', () => modalTicket.classList.add('hidden'));
+
+        // --- LÓGICA DE CONFIGURACIÓN ---
+        function popularConfigForm() {
+            const preciosContainer = document.getElementById('configPreciosContainer');
+            const busesContainer = document.getElementById('configBusesContainer');
+            preciosContainer.innerHTML = '';
+            busesContainer.innerHTML = '';
+
+            for (const key in db.rutas) {
+                const ruta = db.rutas[key];
+                const div = document.createElement('div');
+                div.className = 'flex items-center justify-between';
+                div.innerHTML = `<label for="precio-${key}" class="text-gray-700">${ruta.origen} a ${ruta.destino}:</label>
+                                 <input type="number" step="0.01" id="precio-${key}" name="precio-${key}" value="${ruta.precio}" class="w-1/3 p-2 border rounded-md">`;
+                preciosContainer.appendChild(div);
+            }
+
+            db.horarios.forEach(horario => {
+                const ruta = Object.values(db.rutas).find(r => r.id === horario.id_ruta);
+                const div = document.createElement('div');
+                div.className = 'grid grid-cols-3 items-center gap-4';
+                div.innerHTML = `<span>${ruta.origen.substring(0,10)}... @ ${horario.hora.substring(0,5)}:</span>
+                                 <input type="text" id="bus-${horario.id}" name="bus-${horario.id}" value="${horario.busId}" class="p-2 border rounded-md">
+                                 <button type="button" data-horario-id="${horario.id}" class="config-asientos-btn bg-indigo-500 text-white px-3 py-2 rounded-md hover:bg-indigo-600">Configurar Asientos</button>`;
+                busesContainer.appendChild(div);
+            });
+            
+            document.querySelectorAll('.config-asientos-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const horarioId = parseInt(e.target.dataset.horarioId);
+                    abrirModalConfigAsientos(horarioId);
+                });
+            });
+        }
+        
+        function abrirModalConfigAsientos(horarioId) {
+            const horario = db.horarios.find(h => h.id === horarioId);
+            configBusId.textContent = `Autobús: ${horario.busId}`;
+            renderizarBusConfig(horarioId);
+            modalConfigAsientos.classList.remove('hidden');
+            guardarConfigAsientosBtn.onclick = () => {
+                modalConfigAsientos.classList.add('hidden');
+                actualizarHorarioYInfo(); // Actualiza la info en la página de ventas
+            };
+        }
+        
+        function renderizarBusConfig(horarioId) {
+            const horario = db.horarios.find(h => h.id === horarioId);
+            busLayoutConfig.innerHTML = '';
+            horario.seatMap.forEach((asiento, index) => {
+                const seatDiv = document.createElement('div');
+                seatDiv.className = `seat ${asiento.status}`;
+                seatDiv.textContent = asiento.id;
+                seatDiv.dataset.seatId = asiento.id;
+                seatDiv.addEventListener('click', () => toggleEstadoAsientoConfig(seatDiv, horarioId));
+                
+                const pasilloDiv = document.createElement('div');
+                pasilloDiv.className = 'seat aisle';
+                if ((index + 1) % 2 === 0 && (index + 1) % 4 !== 0) {
+                    busLayoutConfig.appendChild(seatDiv);
+                    busLayoutConfig.appendChild(pasilloDiv);
+                } else {
+                    busLayoutConfig.appendChild(seatDiv);
+                }
+            });
+        }
+        
+        function toggleEstadoAsientoConfig(seatDiv, horarioId) {
+            const seatId = seatDiv.dataset.seatId;
+            const horario = db.horarios.find(h => h.id === horarioId);
+            const asiento = horario.seatMap.find(s => s.id === seatId);
+            
+            if (asiento.status === 'available') {
+                asiento.status = 'occupied';
+                seatDiv.className = 'seat occupied';
+            } else {
+                asiento.status = 'available';
+                seatDiv.className = 'seat available';
+            }
+        }
+
+        configForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(configForm);
+            for (const key in db.rutas) {
+                db.rutas[key].precio = parseFloat(formData.get(`precio-${key}`));
+            }
+            db.horarios.forEach(horario => {
+                horario.busId = formData.get(`bus-${horario.id}`);
+            });
+            configMensaje.textContent = '¡Configuración guardada exitosamente!';
+            configMensaje.className = 'mt-6 text-center font-semibold rounded-lg p-4 bg-green-100 text-green-800';
+            popularRutas();
+            cargarAutobuses();
+        });
+        
+        // --- LÓGICA DE HISTORIAL ---
+        function renderizarHistorial() {
+            historialContainer.innerHTML = '';
+            if (db.historial.length === 0) {
+                historialContainer.innerHTML = '<p class="text-gray-500">No hay ventas registradas.</p>';
+                return;
+            }
+            const table = document.createElement('table');
+            table.className = 'w-full text-left border-collapse';
+            table.innerHTML = `<thead><tr>
+                <th class="py-2 px-3 bg-gray-200 border-b">Ruta</th>
+                <th class="py-2 px-3 bg-gray-200 border-b">Fecha</th>
+                <th class="py-2 px-3 bg-gray-200 border-b">Asientos</th>
+                <th class="py-2 px-3 bg-gray-200 border-b">Total</th>
+            </tr></thead><tbody></tbody>`;
+            const tbody = table.querySelector('tbody');
+            db.historial.slice().reverse().forEach(venta => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td class="py-2 px-3 border-b">${venta.ruta}</td>
+                                 <td class="py-2 px-3 border-b">${venta.fecha}</td>
+                                 <td class="py-2 px-3 border-b">${venta.asientos}</td>
+                                 <td class="py-2 px-3 border-b">$${venta.total.toFixed(2)}</td>`;
+                tbody.appendChild(row);
+            });
+            historialContainer.appendChild(table);
+        }
+
+        // --- EVENT LISTENERS ---
+        rutaSelect.addEventListener('change', cargarAutobuses);
+        autobusSelect.addEventListener('change', actualizarHorarioYInfo);
+        cantidadInput.addEventListener('input', actualizarHorarioYInfo);
+
+        // --- INICIALIZACIÓN ---
+        document.addEventListener('DOMContentLoaded', () => {
+            setDefaultDate();
+            popularRutas();
+            cargarAutobuses();
+            switchPanel('Venta');
+        });
+    </script>
+</body>
+</html>
