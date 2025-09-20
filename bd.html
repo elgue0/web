@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi App de Ventas - Conectada a la Nube</title>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        /* --- ESTILOS CSS (Sin cambios, van aquí) --- */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+        :root {
+            --primary-bg: #222B3D; --secondary-bg: #2C3E50; --accent-color: #3498db;
+            --success-color: #2ecc71; --whatsapp-color: #25D366; --warning-color: #f1c40f;
+            --danger-color: #e74c3c; --text-light: #ecf0f1; --main-bg: #F0F2F5;
+            --card-bg: #FFFFFF; --border-color: #E0E0E0; --text-dark: #333;
+            --shadow-light: rgba(0,0,0,0.05); --seat-available: #A8D8F0; --seat-selected: #3498db;
+            --seat-occupied: #6E7E91;
+        }
+        body { font-family: 'Roboto', sans-serif; margin: 0; background-color: var(--main-bg); color: var(--text-dark); -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .app-container { display: flex; min-height: 100vh; }
+        .sidebar { width: 250px; background-color: var(--primary-bg); color: var(--text-light); position: fixed; height: 100%; box-shadow: 2px 0 5px rgba(0,0,0,0.1); z-index: 100; }
+        .sidebar-header { padding: 25px 20px; text-align: center; font-size: 1.6em; font-weight: 700; border-bottom: 1px solid var(--secondary-bg); }
+        .sidebar-header i { color: var(--accent-color); margin-right: 10px; }
+        .sidebar-menu { list-style: none; padding: 10px 0; margin: 0; }
+        .sidebar-menu li a { display: flex; align-items: center; padding: 15px 20px; color: var(--text-light); text-decoration: none; transition: all 0.3s; border-left: 5px solid transparent; }
+        .sidebar-menu li a i { margin-right: 15px; font-size: 1.2em; width: 20px; text-align: center; }
+        .sidebar-menu li a:hover { background-color: var(--secondary-bg); border-left-color: var(--accent-color); }
+        .sidebar-menu li a.active { background-color: var(--accent-color); border-left-color: #fff; font-weight: 500; }
+        .main-content { margin-left: 250px; flex-grow: 1; padding: 30px; }
+        .main-header { background-color: var(--card-bg); padding: 20px 25px; margin-bottom: 30px; border-radius: 8px; box-shadow: 0 2px 5px var(--shadow-light); display: flex; align-items: center; gap: 15px; }
+        .main-header h1 { margin: 0; font-size: 1.8em; font-weight: 500; color: var(--primary-bg); }
+        .main-header i { color: var(--accent-color); }
+        .content { background-color: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 2px 5px var(--shadow-light); }
+        .content-split { display: flex; gap: 30px; flex-wrap: wrap; }
+        .content-split > div { flex: 1; min-width: 300px; }
+        .page-content { display: none; } 
+        .page-content.active { display: block; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 25px; }
+        .card { background: var(--card-bg); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color); }
+        .card h2 { margin-top: 0; color: var(--primary-bg); font-size: 1.3em; font-weight: 500; }
+        .card-full-width { grid-column: 1 / -1; }
+        .metric-value { font-size: 2em; font-weight: 700; color: var(--accent-color); }
+        .metric-subtitle { font-size: 0.9em; color: #777; margin-top: -5px; }
+        .card-info { position: relative; overflow: hidden; }
+        .card-icon { position: absolute; bottom: -10px; right: -10px; font-size: 4em; color: rgba(52, 152, 219, 0.1); }
+        .chart-placeholder { width: 100%; height: 200px; border-radius: 5px; margin-top: 10px; display: flex; align-items: center; justify-content: center; background-color: #f8f9fa; color: #aaa; font-style: italic; font-size: 0.9em; }
+        .chart-placeholder.small-chart { height: 120px; }
+        .horizontal-menu { margin-bottom: 25px; border-bottom: 1px solid var(--border-color); display: flex; flex-wrap: wrap; gap: 15px; }
+        .tab-link { padding: 10px 15px; text-decoration: none; cursor: pointer; color: var(--text-dark); font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.3s; }
+        .tab-link:hover { color: var(--accent-color); }
+        .tab-link.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-content h3 { margin-top: 10px; }
+        .form-container { max-width: 700px; margin-top: 20px; }
+        .form-row { display: flex; gap: 20px; flex-wrap: wrap; }
+        .form-row .form-group { flex: 1; min-width: 250px;}
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; box-sizing: border-box; font-size: 1em; }
+        .form-group .input-with-button { display: flex; gap: 10px; }
+        .form-group .input-with-button input { flex-grow: 1; }
+        .form-group input[readonly] { background-color: #f0f2f5; }
+        .btn { background-color: var(--accent-color); color: white; padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 1em; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; transition: background-color 0.3s; }
+        .btn:hover { background-color: #2980b9; }
+        .btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .btn.btn-success { background-color: var(--success-color); }
+        .btn.btn-success:hover { background-color: #27ae60; }
+        .btn.btn-whatsapp { background-color: var(--whatsapp-color); }
+        .btn.btn-whatsapp:hover { background-color: #128C7E; }
+        .btn-small { padding: 8px 12px; font-size: 0.9em; height: 46px; align-self: flex-end; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .data-table th, .data-table td { border: 1px solid var(--border-color); padding: 12px; text-align: left; }
+        .data-table th { background-color: #f8f9fa; }
+        .data-table tbody tr:hover { background-color: #f1f1f1; }
+        .data-table tbody:empty::after { content: "No hay registros para mostrar."; display: table-cell; padding: 20px; text-align: center; color: #999; font-style: italic; }
+        .status-select { padding: 5px; border-radius: 4px; border: 1px solid var(--border-color); }
+        .status-En-Tránsito { color: var(--accent-color); font-weight: 500; }
+        .status-Entregado { color: var(--success-color); font-weight: 500; }
+        .status-En-Sucursal { color: var(--warning-color); font-weight: 500; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal-container { background-color: var(--card-bg); padding: 25px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); width: auto; max-width: 90%; min-width: 400px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        .modal-header h3 { margin: 0; font-weight: 500; }
+        .close-modal-btn { background: none; border: none; font-size: 1.5em; cursor: pointer; color: #888; }
+        .seat-map-container { display: flex; gap: 20px; align-items: center; }
+        .bus-layout { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; background-color: #f0f2f5; padding: 20px; border-radius: 5px; border: 1px solid var(--border-color); }
+        .seat { width: 35px; height: 35px; border-radius: 5px; cursor: pointer; transition: transform 0.2s, background-color 0.2s; display: flex; align-items: center; justify-content: center; font-size: 0.8em; color: var(--primary-bg); position: relative; }
+        .seat.available { background-color: var(--seat-available); }
+        .seat.available:hover { transform: scale(1.1); }
+        .seat.selected { background-color: var(--seat-selected); color: white; }
+        .seat.occupied { background-color: var(--seat-occupied); cursor: help; color: white; }
+        .aisle { grid-column: 3; }
+        .seat-info { display: flex; flex-direction: column; gap: 10px; padding: 10px; border-left: 1px solid var(--border-color); padding-left: 20px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.9em;}
+        .legend-box { width: 20px; height: 20px; border-radius: 3px; }
+        #seat-counter { margin-top: 15px; font-weight: 500; font-size: 1.1em; }
+        .modal-footer { margin-top: 25px; text-align: right; border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-footer.centered { justify-content: center; }
+        #payment-total { font-size: 1.8em; font-weight: 700; color: var(--primary-bg); text-align: center; margin: 10px 0 20px 0; }
+        .payment-methods { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .payment-methods label { padding: 10px 15px; border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; transition: all 0.3s; }
+        .payment-methods input[type="radio"] { display: none; }
+        .payment-methods input[type="radio"]:checked + label { background-color: var(--accent-color); color: white; border-color: var(--accent-color); }
+        .payment-fields { display: none; }
+        #cambio-regresar { font-weight: 500; font-size: 1.1em; color: var(--success-color); }
+        #seat-tooltip { display: none; position: absolute; background-color: var(--primary-bg); color: white; padding: 8px 12px; border-radius: 6px; font-size: 0.9em; z-index: 1100; pointer-events: none; transform: translateX(-50%); white-space: nowrap; }
+        #signature-pad { border: 1px solid var(--border-color); border-radius: 6px; cursor: crosshair; }
+        #ticket-preview-area { position: absolute; left: -9999px; top: auto; width: auto; height: auto; overflow: hidden; }
+        #scanner-container { position: relative; width: 320px; height: 240px; margin: auto; border: 2px solid var(--border-color); border-radius: 8px; overflow: hidden; background-color: #000; }
+        #scanner-video { width: 100%; height: 100%; object-fit: cover; }
+        #scanner-result { margin-top: 20px; padding: 15px; border-radius: 8px; font-weight: 500; text-align: center; display: none; }
+        #scanner-result.success { border: 2px solid var(--success-color); background-color: #eafaf1; color: var(--success-color); }
+        #scanner-result.error { border: 2px solid var(--danger-color); background-color: #fbeae8; color: var(--danger-color); }
+        #scanner-result i { margin-right: 8px; }
+    </style>
+</head>
+<body>
+    <div id="seat-tooltip"></div>
+    <div id="ticket-preview-area"></div>
+
+    <div class="app-container">
+        <nav class="sidebar">
+             <div class="sidebar-header"><h3><i class="fas fa-chart-pie"></i> Mi App</h3></div>
+             <ul class="sidebar-menu">
+                <li><a href="#inicio" class="nav-link active"><i class="fas fa-home"></i> Inicio</a></li>
+                <li><a href="#punto-venta" class="nav-link"><i class="fas fa-cash-register"></i> Punto de Venta</a></li>
+                <li><a href="#clientes" class="nav-link"><i class="fas fa-users"></i> Clientes</a></li>
+                <li><a href="#chofer" class="nav-link"><i class="fas fa-id-card"></i> Chofer</a></li>
+                <li><a href="#ventas-negocio" class="nav-link"><i class="fas fa-store"></i> Ventas de Negocio</a></li>
+                <li><a href="#paqueteria" class="nav-link"><i class="fas fa-box-open"></i> Paquetería</a></li>
+                <li><a href="#renta-ban" class="nav-link"><i class="fas fa-bus"></i> Renta de Ban</a></li>
+                <li><a href="#historial" class="nav-link"><i class="fas fa-history"></i> Historial de Venta</a></li>
+                <li><a href="#configuracion" class="nav-link"><i class="fas fa-cogs"></i> Configuración</a></li>
+            </ul>
+        </nav>
+
+        <main class="main-content">
+            <div id="inicio" class="page-content active">
+                <header class="main-header"><h1><i class="fas fa-chart-line"></i> Dashboard Overview</h1></header>
+                <div class="content"><div class="dashboard-grid">
+                    <div class="card card-full-width"><h2>Ventas de Boletos (Últimos 6 meses)</h2><div class="chart-placeholder">Gráfico de barras de ventas</div></div>
+                    <div class="card"><h2>Renta de Ban</h2><p class="metric-value" id="dashboard-renta-ban">$0</p><div class="chart-placeholder small-chart">Gráfico de área de rentas</div></div>
+                    <div class="card card-info"><h2>Nuevos Clientes</h2><p class="metric-value" id="dashboard-nuevos-clientes">+0</p><p class="metric-subtitle">Total Registrados</p><i class="fas fa-users card-icon"></i></div>
+                    <div class="card"><h2>Ventas de Negocio</h2><div class="chart-placeholder small-chart">Gráfico de barras de ventas</div></div>
+                    <div class="card card-info"><h2>Envíos de Paquetería</h2><p class="metric-value" id="dashboard-paqueteria">0</p><p class="metric-subtitle">Total Registrados</p><i class="fas fa-truck-fast card-icon"></i></div>
+                </div></div>
+            </div>
+
+            <div id="punto-venta" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-cash-register"></i> Punto de Venta</h1></header>
+                <div class="content">
+                    <nav class="horizontal-menu">
+                        <a class="tab-link" onclick="showTab(this, 'venta-boletos')">Venta de Boletos</a>
+                        <a class="tab-link" onclick="showTab(this, 'ventas-negocio-pv')">Ventas de Negocio</a>
+                    </nav>
+                    <div id="venta-boletos" class="tab-content">
+                        <h3>Formulario: Venta de Boletos</h3>
+                        <form class="form-container" id="venta-boletos-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="buscar-cliente">Buscar Cliente Frecuente:</label>
+                                    <div class="input-with-button">
+                                        <input type="text" id="buscar-cliente" list="client-list" placeholder="Escribe el nombre del cliente..." required>
+                                        <datalist id="client-list"></datalist>
+                                        <button type="button" class="btn btn-small" id="open-new-client-modal"><i class="fas fa-plus"></i> Nuevo</button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="tipo-cliente">Tipo de Cliente:</label>
+                                    <select id="tipo-cliente"><option>General</option><option>Estudiante</option></select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="ruta-viaje">Ruta:</label><select id="ruta-viaje"><option value="victoria-slm">CIUDAD VICTORIA a SOTO LA MARINA</option><option value="slm-victoria">SOTO LA MARINA a CIUDAD VICTORIA</option></select></div>
+                                <div class="form-group"><label for="parada-intermedia">Parada Intermedia:</label><select id="parada-intermedia"><option value="directo">Directo</option><option value="villa-de-casas">Con parada en Villa de Casas</option></select></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label for="fecha-boleto">Fecha:</label><input type="date" id="fecha-boleto" required></div>
+                                <div class="form-group"><label for="hora-boleto">Hora:</label><select id="hora-boleto" required></select></div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Asientos Seleccionados:</label><input type="text" id="cantidad-boletos" value="0" readonly></div>
+                            </div>
+                            <div class="form-row">
+                                <button type="button" class="btn" id="open-seat-modal"><i class="fas fa-chair"></i> Seleccionar Asientos</button>
+                                <button type="button" class="btn" id="confirmar-venta-btn"><i class="fas fa-check"></i> Confirmar Venta</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div id="ventas-negocio-pv" class="tab-content"><h3>Ventas de Negocio (Desde Punto de Venta)</h3><p>Interfaz simplificada para vender productos.</p></div>
+                </div>
+            </div>
+
+            <div id="clientes" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-users"></i> Gestión de Clientes Frecuentes</h1></header>
+                <div class="content">
+                    <div class="content-split">
+                        <div>
+                            <h3>Registrar Nuevo Cliente</h3>
+                            <form class="form-container" id="client-registration-form">
+                                <div class="form-group"><label for="client-name">Nombre Completo:</label><input type="text" id="client-name" required></div>
+                                <div class="form-group"><label for="client-dob">Fecha de Nacimiento:</label><input type="date" id="client-dob" required></div>
+                                <div class="form-group"><label for="client-phone">Número de Teléfono:</label><input type="tel" id="client-phone" required></div>
+                                <button type="submit" class="btn"><i class="fas fa-user-plus"></i> Registrar Cliente</button>
+                            </form>
+                        </div>
+                        <div>
+                            <h3>Lista de Clientes Frecuentes</h3>
+                            <table class="data-table">
+                                <thead><tr><th>ID Cliente</th><th>Nombre</th><th>Teléfono</th></tr></thead>
+                                <tbody id="clients-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chofer" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-id-card"></i> Portal del Chofer</h1></header>
+                <div class="content" style="text-align: center;">
+                    <h3>Control de Abordaje</h3>
+                    <button class="btn btn-success" id="start-scan-btn"><i class="fas fa-qrcode"></i> Escanear QR de Pasajero</button>
+                    <div id="scanner-container" style="display: none; margin-top: 20px;">
+                        <video id="scanner-video"></video>
+                    </div>
+                    <div id="scanner-result"></div>
+                </div>
+            </div>
+
+            <div id="ventas-negocio" class="page-content">
+                 <header class="main-header"><h1><i class="fas fa-store"></i> Ventas de Negocio</h1></header>
+                <div class="content">
+                    <nav class="horizontal-menu"><a class="tab-link" onclick="showTab(this, 'almacen')">Almacén</a><a class="tab-link" onclick="showTab(this, 'gestion-articulos')">Gestión de Artículos</a></nav>
+                    <div id="almacen" class="tab-content"><h3>Inventario del Almacén</h3><table class="data-table">
+                        <thead><tr><th>Código</th><th>Artículo</th><th>Cantidad</th><th>Precio</th><th>Acciones</th></tr></thead>
+                        <tbody id="almacen-tbody"></tbody>
+                    </table></div>
+                    <div id="gestion-articulos" class="tab-content"><h3>Añadir Nuevo Artículo</h3><form class="form-container" id="add-item-form">
+                        <div class="form-row"><div class="form-group"><label>Código:</label><input type="text" id="item-code" required></div><div class="form-group"><label>Nombre:</label><input type="text" id="item-name" required></div></div>
+                        <div class="form-row"><div class="form-group"><label>Cantidad:</label><input type="number" id="item-quantity" required></div><div class="form-group"><label>Precio:</label><input type="number" id="item-price" step="0.01" required></div></div>
+                        <button type="submit" class="btn"><i class="fas fa-plus"></i> Añadir Artículo</button>
+                    </form></div>
+                </div>
+            </div>
+            
+            <div id="paqueteria" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-box-open"></i> Paquetería</h1></header>
+                <div class="content">
+                    <nav class="horizontal-menu">
+                        <a class="tab-link" onclick="showTab(this, 'registrar-envio')">Registrar Envío</a>
+                        <a class="tab-link" onclick="showTab(this, 'paquetes-a-enviar')">Paquetes a Enviar</a>
+                        <a class="tab-link" onclick="showTab(this, 'paquetes-a-entregar')">Paquetes a Entregar</a>
+                        <a class="tab-link" onclick="showTab(this, 'gestion-paquetes')">Gestión de Paquetes</a>
+                    </nav>
+
+                    <div id="registrar-envio" class="tab-content">
+                        <h3>Formulario de Registro</h3>
+                        <form class="form-container" id="paqueteria-form">
+                            <div class="form-row"><div class="form-group"><label for="paq-origen">Origen:</label><input type="text" id="paq-origen" readonly></div><div class="form-group"><label for="paq-destino">Destino:</label><select id="paq-destino"><option>Soto la Marina</option><option>Ciudad Victoria</option><option>Monterrey</option></select></div></div>
+                            <div class="form-row"><div class="form-group"><label for="paq-remitente">Remitente:</label><input type="text" id="paq-remitente" required></div><div class="form-group"><label for="paq-destinatario">Destinatario:</label><input type="text" id="paq-destinatario" required></div></div>
+                            <div class="form-row"><div class="form-group"><label for="paq-destinatario-telefono">Teléfono Destinatario (10 dígitos):</label><input type="tel" id="paq-destinatario-telefono" placeholder="8341234567" required></div><div class="form-group"><label for="paq-costo">Costo:</label><input type="number" id="paq-costo" step="0.50" min="0" required></div></div>
+                            <div class="form-row"><div class="form-group"><label for="paq-fecha-llegada">Fecha Estimada de Llegada:</label><input type="date" id="paq-fecha-llegada" required></div></div>
+                            <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Registrar Envío</button>
+                        </form>
+                    </div>
+
+                    <div id="paquetes-a-enviar" class="tab-content">
+                        <h3>Paquetes a Enviar desde mi Sucursal (Pendientes)</h3>
+                        <table class="data-table"><thead><tr><th>Folio</th><th>Destino</th><th>Destinatario</th><th>Estado</th></tr></thead><tbody id="paquetes-a-enviar-tbody"></tbody></table>
+                    </div>
+
+                     <div id="paquetes-a-entregar" class="tab-content">
+                        <h3>Paquetes a Entregar en mi Sucursal (Pendientes)</h3>
+                        <table class="data-table"><thead><tr><th>Folio</th><th>Origen</th><th>Remitente</th><th>Estado</th></tr></thead><tbody id="paquetes-a-entregar-tbody"></tbody></table>
+                    </div>
+
+                    <div id="gestion-paquetes" class="tab-content">
+                        <h3>Gestión de Todos los Paquetes (de mi Sucursal)</h3>
+                        <table class="data-table">
+                            <thead><tr><th>Folio</th><th>Fecha Reg.</th><th>Origen</th><th>Destino</th><th>Estado</th><th>Llegada Real</th><th>Recibió</th></tr></thead>
+                            <tbody id="gestion-paquetes-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="renta-ban" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-bus"></i> Renta de Ban</h1></header>
+                <div class="content">
+                    <nav class="horizontal-menu"><a class="tab-link" onclick="showTab(this, 'cotizacion')">Cotización</a><a class="tab-link" onclick="showTab(this, 'datos-renta')">Datos de Renta</a></nav>
+                    <div id="cotizacion" class="tab-content"><h3>Generar Cotización</h3><form class="form-container">
+                        <div class="form-row"><div class="form-group"><label>Origen:</label><input type="text" required></div><div class="form-group"><label>Destino:</label><input type="text" required></div></div>
+                        <div class="form-row"><div class="form-group"><label>Fecha del Viaje:</label><input type="date" required></div><div class="form-group"><label>No. de Pasajeros:</label><input type="number" required></div></div>
+                        <button type="submit" class="btn"><i class="fas fa-calculator"></i> Calcular Cotización</button>
+                    </form></div>
+                    <div id="datos-renta" class="tab-content">
+                        <h3>Registrar Renta</h3>
+                        <form class="form-container" id="renta-form">
+                            <div class="form-group"><label for="renta-cliente">Nombre del Cliente:</label><input type="text" id="renta-cliente" required></div>
+                            <div class="form-row"><div class="form-group"><label>Fecha y Hora de Salida:</label><input type="datetime-local" required></div><div class="form-group"><label>Fecha y Hora de Llegada:</label><input type="datetime-local" required></div></div>
+                            <button type="submit" class="btn"><i class="fas fa-print"></i> Imprimir Contrato</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div id="historial" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-history"></i> Historial de Venta</h1></header>
+                <div class="content">
+                    <nav class="horizontal-menu">
+                        <a class="tab-link" onclick="showTab(this, 'historial-boletos')">H Boletos</a>
+                        <a class="tab-link" onclick="showTab(this, 'historial-negocio')">H Negocio</a>
+                        <a class="tab-link" onclick="showTab(this, 'historial-renta')">H Renta</a>
+                        <a class="tab-link" onclick="showTab(this, 'historial-paqueteria')">H Paquetería</a>
+                    </nav>
+                    <div id="historial-boletos" class="tab-content"><table class="data-table"><thead><tr><th>Folio</th><th>Fecha</th><th>Pasajero</th><th>Ruta</th><th>Monto</th></tr></thead><tbody id="historial-boletos-tbody"></tbody></table></div>
+                    <div id="historial-negocio" class="tab-content"><table class="data-table"><thead><tr><th>Folio</th><th>Fecha</th><th>Artículos</th><th>Monto</th></tr></thead><tbody id="historial-negocio-tbody"></tbody></table></div>
+                    <div id="historial-renta" class="tab-content"><table class="data-table"><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Monto</th></tr></thead><tbody id="historial-renta-tbody"></tbody></table></div>
+                    <div id="historial-paqueteria" class="tab-content"><table class="data-table"><thead><tr><th>Folio</th><th>Fecha</th><th>Remitente</th><th>Destinatario</th><th>Monto</th></tr></thead><tbody id="historial-paqueteria-tbody"></tbody></table></div>
+                </div>
+            </div>
+            
+            <div id="configuracion" class="page-content">
+                <header class="main-header"><h1><i class="fas fa-cogs"></i> Configuración</h1></header>
+                <div class="content">
+                    <h3>Ajustes Generales</h3>
+                    <form class="form-container" id="config-form">
+                        <div class="form-group">
+                            <label for="active-branch">Sucursal Activa:</label>
+                            <select id="active-branch">
+                                <option>Ciudad Victoria</option>
+                                <option>Soto la Marina</option>
+                                <option>Monterrey</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Nombre de la Empresa:</label><input type="text" value="ATorres"></div>
+                        <div class="form-group"><label>Teléfono de Reservas:</label><input type="text" value="(835) 108 1114"></div>
+                        <button type="submit" class="btn"><i class="fas fa-save"></i> Guardar Cambios</button>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div class="modal-overlay" id="seat-selection-modal"><div class="modal-container"><div class="modal-header"><h3>Selecciona tus Asientos</h3><button class="close-modal-btn" id="close-seat-modal">&times;</button></div><div class="seat-map-container"><div class="bus-layout" id="bus-layout"></div><div class="seat-info"><div class="legend-item"><div class="legend-box" style="background-color: var(--seat-available);"></div><span>Disponible</span></div><div class="legend-item"><div class="legend-box" style="background-color: var(--seat-selected);"></div><span>Seleccionado</span></div><div class="legend-item"><div class="legend-box" style="background-color: var(--seat-occupied);"></div><span>Ocupado</span></div><div id="seat-counter">Asientos seleccionados: 0</div></div></div><div class="modal-footer"><button class="btn" id="confirm-seats-btn"><i class="fas fa-check"></i> Confirmar</button></div></div></div>
+    <div class="modal-overlay" id="payment-modal"><div class="modal-container"><div class="modal-header"><h3>Procesar Cobro</h3><button class="close-modal-btn" id="close-payment-modal">&times;</button></div><div><p style="text-align: center; margin-top: 0;">Total a Pagar:</p><h2 id="payment-total">$0.00</h2><div class="form-group"><label>Método de Pago:</label><div class="payment-methods"><input type="radio" id="pay-efectivo" name="payment-method" value="efectivo" checked><label for="pay-efectivo"><i class="fas fa-money-bill-wave"></i> Efectivo</label><input type="radio" id="pay-transferencia" name="payment-method" value="transferencia"><label for="pay-transferencia"><i class="fas fa-exchange-alt"></i> Transferencia</label><input type="radio" id="pay-tarjeta" name="payment-method" value="tarjeta"><label for="pay-tarjeta"><i class="far fa-credit-card"></i> Tarjeta</label></div></div><div id="efectivo-fields" class="payment-fields"><div class="form-group"><label for="monto-recibido">Monto Recibido:</label><input type="number" id="monto-recibido" placeholder="0.00"></div><p id="cambio-regresar">Cambio a regresar: $0.00</p></div><div id="referencia-fields" class="payment-fields" style="display: none;"><div class="form-group"><label for="pago-referencia">Referencia de Pago:</label><input type="text" id="pago-referencia" placeholder="ID de transacción, etc."></div></div></div><div class="modal-footer"><button type="button" class="btn btn-danger" id="cancel-payment-btn">Cancelar</button><button type="button" class="btn btn-success" id="process-payment-btn"><i class="fas fa-lock"></i> Procesar Pago</button></div></div></div>
+    <div class="modal-overlay" id="new-client-modal"><div class="modal-container"><div class="modal-header"><h3>Registrar Nuevo Cliente Frecuente</h3><button class="close-modal-btn" id="close-new-client-modal">&times;</button></div><form class="form-container" id="new-client-modal-form"><div class="form-group"><label for="modal-client-name">Nombre Completo:</label><input type="text" id="modal-client-name" required></div><div class="form-group"><label for="modal-client-dob">Fecha de Nacimiento:</label><input type="date" id="modal-client-dob" required></div><div class="form-group"><label for="modal-client-phone">Número de Teléfono:</label><input type="tel" id="modal-client-phone" required></div></form><div class="modal-footer"><button type="button" class="btn btn-danger" id="cancel-new-client-btn">Cancelar</button><button type="button" class="btn btn-success" id="save-new-client-btn"><i class="fas fa-user-plus"></i> Guardar Cliente</button></div></div></div>
+    <div class="modal-overlay" id="delivery-confirmation-modal"><div class="modal-container"><div class="modal-header"><h3>Confirmar Entrega</h3><button class="close-modal-btn" id="close-delivery-modal">&times;</button></div><form class="form-container" id="delivery-confirmation-form"><div class="form-group"><label for="receiver-name">Nombre de quien recibe:</label><input type="text" id="receiver-name" required></div><div class="form-group"><label>Firma de recibido:</label><canvas id="signature-pad" width="400" height="150"></canvas></div></form><div class="modal-footer"><button type="button" class="btn btn-danger" id="cancel-delivery-btn">Cancelar</button><button type="button" class="btn btn-success" id="confirm-delivery-btn"><i class="fas fa-check-circle"></i> Confirmar Entrega</button></div></div></div>
+    <div class="modal-overlay" id="ticket-option-modal"><div class="modal-container"><div class="modal-header"><h3>Venta Exitosa</h3><button class="close-modal-btn" id="close-ticket-option-modal">&times;</button></div><div><p>La venta se ha procesado correctamente. ¿Qué deseas hacer con el boleto?</p></div><div class="modal-footer centered"><button type="button" class="btn btn-whatsapp" id="whatsapp-ticket-btn"><i class="fab fa-whatsapp"></i> Enviar Digital</button><button type="button" class="btn btn-success" id="print-ticket-btn"><i class="fas fa-print"></i> Imprimir Ticket</button></div></div></div>
+    <div class="modal-overlay" id="delivery-receipt-option-modal"><div class="modal-container"><div class="modal-header"><h3>Entrega Confirmada</h3><button class="close-modal-btn" id="close-delivery-receipt-modal">&times;</button></div><div><p>El paquete ha sido marcado como entregado. ¿Qué deseas hacer con el comprobante?</p></div><div class="modal-footer centered"><button type="button" class="btn btn-whatsapp" id="whatsapp-receipt-btn"><i class="fab fa-whatsapp"></i> Enviar Digital</button><button type="button" class="btn btn-success" id="print-receipt-btn"><i class="fas fa-print"></i> Imprimir Comprobante</button></div></div></div>
+
+    <script>
